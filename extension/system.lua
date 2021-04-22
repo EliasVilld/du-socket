@@ -1,0 +1,1 @@
+system.IsRunningExplicit = function() return unit.getSignalIn('in')==0 end
