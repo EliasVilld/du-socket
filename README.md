@@ -9,11 +9,43 @@ In order to be used, this library requires a connection to :
 
 <!--List of methods and explanation -->
 # Documentation
-#### foo(*type* arg)
 Description
+## Connection methods
+#### CreateConnection(*string* socket)
+Create a connection for a specific *socket*.
 
-#### foo(*type* arg)
-Description
+#### ClearConnection(*string* socket)
+Clears and closes the connection for a specific *socket*.
+
+#### ClearAllConnection()
+Clears and closes all connections.
+
+## Socket methods
+#### Listen(*string* socket, *function* fnc)
+Sets a handle to listen a specific *socket*.
+_If no connection has been created, create a connection._
+
+#### ListenAll(*function* fnc)
+Sets a handle to listen any transmission.
+
+#### Close(*string* socket)
+Close the socket.
+
+#### GetStatus(*string* socket)
+Get the status of the connection on the socket.
+
+#### Read()
+Wait the next received data.
+
+#### Write(*string* socket, *string* msg)
+Wait the next received data.
+
+
+
+
+## Other methods
+#### Ping()
+Send a ping and listen to the responses of nearby constructs.
 
 <!-- How to use -->
 # How to use
