@@ -1,15 +1,18 @@
-
 function Sockets( emit, recv)
+    assert(serialize,"Missing serialize library.")
+    
+    --Local declaration
     local self = {}
     local _key = math.random(255)
-    
+     
+    --Properties
     self.Emitter = emit
     self.Receiver = recv
        
     self.WaitPing = false    
     self.Connections = {}
     
-
+    --Core slot detection
     for k,v in pairs(unit) do
         if type(v) == 'table' and v.getElementClass then
             local class = v.getElementClass()
@@ -17,17 +20,18 @@ function Sockets( emit, recv)
             if class:find('^CoreUnit') then core = v end
         end
     end
-    
+    assert(core,"Missing link with the Core Unit.")
     self.Id = tostring(core.getConstructId())
     
     
-    --=================================== Connection Methods =========================================
+    --== Connection methods ==
     --Create connection
     function self.CreateConnection( socket)
-        -- Check if existing connection
+        print('Connection creation : ' .. socket)
         if self.Connections[socket] then
             self.Connections[socket] = nil
         end
+        
         local c = {
             Socket = socket,
             Status = "CLOSED",
@@ -39,26 +43,36 @@ function Sockets( emit, recv)
         }
         
         self.Connections[socket] = c
-        
         return c
     end
 
+    
     --Clear connection
     function self.ClearConnection( socket)
         self.Close( socket)
         self.Connections[socket] = nil
     end
 
-    --Clear connection
+    
+    --Clear all connections
     function self.ClearAllConnection()
         self.Connections = nil
     end
 
 
-    --================================ Socket Methods =======================================
-    --Create a listen hangler on socket
+    -- Ping construct around
+    function self.Ping()
+        self.Close( "*")
+        self.WaitPing = true
+
+        self.ListenAll( _receiveSYN)
+        self.Emitter.send( "ping",nil)
+    end
+    
+
+    --== Socket methods ==
+    --Create a listen handler on socket
     function self.Listen( socket, fnc)
-        print('Connection creation : ' .. socket)
         if not self.Connections[socket] then self.CreateConnection( socket) end
 
         local c = self.Connections[socket]
@@ -97,21 +111,21 @@ function Sockets( emit, recv)
     end
 
 
-    --Wait for data on the socket, useless infact
+    --Wait for data on the socket
     function self.Read()
         return coroutine.yield()
     end
 
 
     --Write on the socket
-    function self.Write( socket, message)
+    function self.Write( socket, msg)
         if socket == self.Id then return end
-
-        local data = deserialize(message) or {dat='[Unrecognized format]'.. message}
+        
+        local data = deserialize(msg) or {dat='[Unrecognized format]'.. msg}
         
         local c = self.Connections[socket]
         
-        print(socket .. ' : ' .. message)
+        print(socket .. ' : ' .. msg)
 
         --Check if existing connection or listening
         if not c or not c.Handler then
@@ -125,7 +139,7 @@ function Sockets( emit, recv)
                 coroutine.resume( self.Connections["*"].Handler, data, socket)
             else          
                 
-                --Notify non listening
+                --Notify transmission received but not listening
                 print("Message received on '" .. socket .. "' socket. Was not listening.")
             end
         else
@@ -144,7 +158,7 @@ function Sockets( emit, recv)
 
 
     --Send transmission on socket
-    function self.Send( socket, data, pck, ttl)
+    function self.Send( socket, data, pcket, ttl)
         local packet = {
             snd = self.Id,
             rec = socket or "",
@@ -156,21 +170,22 @@ function Sockets( emit, recv)
         self.Emitter.send( self.Id, serialize(packet))
     end
 
-    --=========================== Dispatching methods ==========================
-    --Default dispatcher, just do nothing
+    
+    --== Dispatching methods ==
+    -- Default dispatching function
     function _dispatch(socket)
         while true do
         	coroutine.yield()
         end
     end
     
-    --Set a dispatcher function
+    -- Set a specific dispatcher function
     function self.SetDispatch( fnc)
         _dispatch = fnc
     end
     
-    --=========================== Connection etablishment calls ==========================
-    --======================= CLIENT =========================
+    --== Triple hand shake connection methods ==
+    --= Client side =
     function _receiveSYN()
         local data, socket = {dat=""}, nil
 
@@ -237,16 +252,7 @@ function Sockets( emit, recv)
     end
 
 
-    function self.Ping()
-        self.Close( "*")
-        self.WaitPing = true
-
-        self.ListenAll( _receiveSYN)
-        self.Emitter.send( "ping",nil)
-    end
-
-
-    --======================= SERVER =========================    
+    --= Server side = 
     function _receiveSYNACK()
         local data, socket = {dat=""}, nil
 
@@ -284,7 +290,7 @@ function Sockets( emit, recv)
         self.Close( "*")
     end    
 
-
+    -- Ping handler
     function _receivePing()
         while true do
             local data = coroutine.yield()
@@ -302,13 +308,18 @@ function Sockets( emit, recv)
     end
 
 
-
+    -- Initialization
+    -- Set broadcast receiving connection
     self.CreateConnection( "*")
+    
+    -- Set handler to receive ping
     self.Listen( "ping", _receivePing)
-    self.ListenAll( _receiveSYNACK)    
-
-    --Send its key when started for the case it's started by an analogic signal from a receiver
+    
+    -- Set the ping answer listener
+    self.ListenAll( _receiveSYNACK)
+    --Send the SYN key when started (in case it's started by an analogic signal)
     self.Send( nil, { SYN=_key})
+    
 
     return self
 end
